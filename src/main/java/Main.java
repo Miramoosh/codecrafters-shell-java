@@ -6,6 +6,10 @@ public class Main {
         while(true){
             System.out.print("$ ");
             String commands = sc.nextLine();
+            if(commands.equalsIgnoreCase("exit")){
+                System.out.print(0);
+                break;
+            }
             System.out.println(commands+": command not found");
         }
     }
