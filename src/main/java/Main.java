@@ -8,7 +8,7 @@ public class Main {
             String command = scanner.nextLine();
             if (command.equals("exit 0")) break;
             String[] commands = command.split(" ");
-            if(command.contains("type echo") || command.contains("type exit")){
+            if(command.contains("type echo") || command.contains("type exit") || command.contains("type type")) {
                 System.out.println(commands[1]+" is a shell builtin");
             }
             else if(command.contains("echo")){
