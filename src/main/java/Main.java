@@ -1,3 +1,5 @@
+import java.io.File;
+import java.util.Objects;
 import java.util.Scanner;
 
 public class Main {
@@ -7,22 +9,45 @@ public class Main {
             System.out.print("$ ");
             String command = scanner.nextLine();
             String[] commands = command.split(" ");
-            if (command.equals("exit 0")) break;
-            else if(command.startsWith("type") && ((command.endsWith("echo")) || (command.endsWith("exit 0")) ||  (command.endsWith("exit")) || (command.endsWith("type")))) {
-                System.out.println(commands[1]+" is a shell builtin");
+
+            //exit condition
+            if (command.equals("exit 0") || command.equals("exit")) break;
+
+            //type command
+            else if(command.contains("type")){
+                String a=type_and_path_handling(commands[1]);
+                System.out.println(a);
             }
-            else if(command.startsWith("type") && ((!command.endsWith("echo")) || (!command.endsWith("exit 0")) ||  (!command.endsWith("exit")) || (!command.endsWith("type")))){
-                System.out.println(commands[1]+" not found");
-            }
+            //echo command
             else if(command.contains("echo")){
                 for(int i=1;i<commands.length;i++){
                     System.out.print(commands[i]+" ");
                 }
                 System.out.println();
             }
+
+            //invalid command
             else {
                 System.out.println(command + ": command not found");
             }
         }
+    }
+
+    public static String type_and_path_handling(String command){
+        String[] cmd={"exit","echo","type"};
+        String pathEnv = System.getenv("PATH");
+        String[] commands = pathEnv.split(";");
+        for(String i:cmd){
+            if(Objects.equals(i,command)){
+                return i +" is a shell builtin";
+            }
+        }
+        for(int j=0;j<commands.length;j++){
+            File file=new File(commands[j],command);
+            if(file.exists()){
+                return command + " is " + file.getAbsolutePath();
+            }
+        }
+        return command + ": not found";
     }
 }
