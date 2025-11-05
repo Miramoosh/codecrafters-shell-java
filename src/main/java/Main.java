@@ -83,17 +83,21 @@ public class Main {
     public static void runExternalProgram(String executablePath, String[] args) {
         try {
             List<String> commandList = new ArrayList<>();
-            commandList.add(executablePath);
+            commandList.add(executablePath); // executable to run
+
+            // add all remaining arguments
             for (int i = 1; i < args.length; i++) {
                 commandList.add(args[i]);
             }
 
             ProcessBuilder pb = new ProcessBuilder(commandList);
-            pb.inheritIO();  // shows the output of external program
+            pb.inheritIO();
+            pb.environment().put("_", args[0]); // keep short name
             Process process = pb.start();
             process.waitFor();
         } catch (Exception e) {
             System.out.println("Error running program: " + e.getMessage());
         }
     }
+
 }
