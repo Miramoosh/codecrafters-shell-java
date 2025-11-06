@@ -46,7 +46,7 @@ public class Main {
     }
 
     public static String type_and_path_handling(String command) {
-        String[] cmd = {"exit", "echo", "type"};
+        String[] cmd = {"exit", "echo", "type","pwd"};
         String pathEnv = System.getenv("PATH");
         String[] directory = pathEnv.split(File.pathSeparator, -1);
         for (String i : cmd) {
