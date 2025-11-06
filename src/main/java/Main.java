@@ -14,8 +14,13 @@ public class Main {
 
             //exit condition
             if (command.equals("exit 0") || command.equals("exit")) break;
-
-                //type command
+            
+            //pwd command
+            else if (command.equals("pwd")) {
+                String a=System.getProperty("user.dir");
+                System.out.println(a);
+            }
+            //type command
             else if (command.contains("type")) {
                 String a = type_and_path_handling(commands[1]);
                 System.out.println(a);
