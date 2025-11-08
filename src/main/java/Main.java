@@ -32,9 +32,8 @@ public class Main {
                 String target_dir=commands[1];
                 File dir = new File(curr_dir,target_dir);
                 if (commands.length < 2) {
-                    // (Optional) You could also make this go to the home directory
                     System.out.println("cd: missing argument");
-                    continue; // Skips the rest of the loop and asks for a new command
+                    continue;
                 }
 
                 if (target_dir.equals("~")) {
@@ -42,11 +41,13 @@ public class Main {
                 }
 
                 if(dir.exists() && dir.isDirectory()) {
-                    curr_dir=dir.getCanonicalPath();
+                    curr_dir=dir.getAbsolutePath();
                 }
-                else{
+                else {
+                    System.out.print("$ ");
                     System.out.println("cd: " + target_dir + ": No such file or directory");
                 }
+
             }
 
             //pwd command
