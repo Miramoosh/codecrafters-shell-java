@@ -7,6 +7,7 @@ import java.util.List;
 public class Main {
     public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
+        String curr_dir=System.getProperty("user.dir");
         while (true) {
             System.out.print("$ ");
             String command = scanner.nextLine();
@@ -14,30 +15,39 @@ public class Main {
 
             //exit condition
             if (command.equals("exit 0") || command.equals("exit")) break;
-            
-            //pwd command
-            else if (command.equals("pwd")) {
-                String a=System.getProperty("user.dir");
-                System.out.println(a);
-            }
+
             //type command
-            else if (command.contains("type")) {
+            else if (commands[0].equals("type")) {
                 String a = type_and_path_handling(commands[1]);
                 System.out.println(a);
             }
             //echo command
-            else if (command.contains("echo")) {
+            else if (commands[0].equals("echo")) {
                 for (int i = 1; i < commands.length; i++) {
                     System.out.print(commands[i] + " ");
                 }
                 System.out.println();
             }
+            else if (commands[0].equals("cd")) {
+                String target_dir=commands[1];
+                File dir = new File(curr_dir,target_dir);
+                if(dir.exists() && dir.isDirectory()) {
+                    curr_dir=dir.getAbsolutePath();
+                }
+                else{
+                    System.out.println("cd: " + target_dir + ": No such file or directory");
+                }
+            }
 
+            //pwd command
+            else if (command.equals("pwd")) {
+                System.out.println(curr_dir);
+            }
             // external programs (search PATH and run)
             else {
                 String executablePath = findExecutable(commands[0]);
                 if (executablePath != null) {
-                    runExternalProgram(executablePath, commands);
+                    runExternalProgram(executablePath, commands,curr_dir);
                 } else {
                     System.out.println(commands[0] + ": command not found");
                 }
@@ -46,7 +56,7 @@ public class Main {
     }
 
     public static String type_and_path_handling(String command) {
-        String[] cmd = {"exit", "echo", "type","pwd"};
+        String[] cmd = {"exit", "echo", "type","pwd","cd"};
         String pathEnv = System.getenv("PATH");
         String[] directory = pathEnv.split(File.pathSeparator, -1);
         for (String i : cmd) {
@@ -80,19 +90,13 @@ public class Main {
         return null;
     }
 
-    /**
-     * Run external program found at executablePath.
-     *
-     * Important: to make argv[0] inside the child be the short program name (what the user typed),
-     * we pass the short name as the first command argument and modify the child's PATH so the
-     * found directory is searched first. This ensures the child process runs the exact file we found
-     * while receiving argv[0] equal to the short name (e.g. "custom_exe_1234").
-     */
-    public static void runExternalProgram(String executablePath, String[] args) {
+    public static void runExternalProgram(String executablePath, String[] args,String currentDirectory) {
         try {
             File execFile = new File(executablePath);
             String parentDir = execFile.getParent();
-            String shortName = args[0]; // what the user typed (program name)
+
+            // what the user typed (program name)
+            String shortName = args[0];
 
             // Build command array where argv[0] is the short name (user typed)
             List<String> cmdList = new ArrayList<>();
@@ -103,6 +107,9 @@ public class Main {
 
             ProcessBuilder pb = new ProcessBuilder(cmdList);
 
+            //This line explicitly tells the ProcessBuilder: "Hey, before you start this new program (ls),
+            // set its starting directory to this path."
+            pb.directory(new File(currentDirectory));
             // Prepend the executable's directory to the child's PATH so the OS will resolve
             // the shortName to the correct absolute file we already found.
             if (parentDir != null) {
@@ -112,8 +119,14 @@ public class Main {
             }
 
             // Inherit IO so the external program's stdout/stderr/stdin show in our console
+            //Without this line we have to add extra code to our program to print the output in the
+            //same console ,With it, it's automatic and easy.
             pb.inheritIO();
 
+            // it is like a remote control for the pb.start function
+            //process is a class
+            //Why do you need that remote control? For the very next line
+            // p.waitFor(), which is like using the remote to ask, "Are you done yet?"
             Process p = pb.start();
 
             // Wait for the program to finish before returning to the shell prompt
@@ -122,4 +135,5 @@ public class Main {
             System.out.println("Error running program: " + e.getMessage());
         }
     }
+
 }
