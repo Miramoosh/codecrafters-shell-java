@@ -31,8 +31,18 @@ public class Main {
             else if (commands[0].equals("cd")) {
                 String target_dir=commands[1];
                 File dir = new File(curr_dir,target_dir);
+                if (commands.length < 2) {
+                    // (Optional) You could also make this go to the home directory
+                    System.out.println("cd: missing argument");
+                    continue; // Skips the rest of the loop and asks for a new command
+                }
+
+                if (target_dir.equals("~")) {
+                    target_dir = System.getProperty("user.home");
+                }
+
                 if(dir.exists() && dir.isDirectory()) {
-                    curr_dir=dir.getAbsolutePath();
+                    curr_dir=dir.getCanonicalPath();
                 }
                 else{
                     System.out.println("cd: " + target_dir + ": No such file or directory");
