@@ -29,26 +29,36 @@ public class Main {
                 System.out.println();
             }
             else if (commands[0].equals("cd")) {
-                String target_dir=commands[1];
-                File dir = new File(curr_dir,target_dir);
+                // guard: ensure argument exists before accessing commands[1]
                 if (commands.length < 2) {
+                    System.out.println("$ ");
                     System.out.println("cd: missing argument");
                     continue;
                 }
 
+                String target_dir = commands[1];
+
+                // ~ maps to user home
                 if (target_dir.equals("~")) {
                     target_dir = System.getProperty("user.home");
                 }
 
-                if(dir.exists() && dir.isDirectory()) {
-                    curr_dir=dir.getAbsolutePath();
-                }
-                else {
-                    System.out.print("$ ");
+                // We require absolute paths for this stage
+                File dir = new File(target_dir);
+                if (!dir.isAbsolute()) {
+                    System.out.println("$ ");
                     System.out.println("cd: " + target_dir + ": No such file or directory");
+                    continue;
                 }
 
+                if (dir.exists() && dir.isDirectory()) {
+                    curr_dir = dir.getAbsolutePath();
+                } else {
+                    System.out.println("$ ");
+                    System.out.println("cd: " + target_dir + ": No such file or directory");
+                }
             }
+
 
             //pwd command
             else if (command.equals("pwd")) {
