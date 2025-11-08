@@ -29,32 +29,26 @@ public class Main {
                 System.out.println();
             }
             else if (commands[0].equals("cd")) {
-
-                // 1. Handle "cd" with no arguments
                 if (commands.length < 2) {
                     System.out.println("cd: missing argument");
-                    continue; // Skips to the next loop
+                    continue;
                 }
 
                 String target_dir = commands[1];
 
-                // 2. Handle the "~" (home) directory shortcut
                 if (target_dir.equals("~")) {
                     target_dir = System.getProperty("user.home");
                 }
 
-                // 3. THIS IS THE FIX: Handle absolute vs. relative paths
                 File dir = new File(target_dir);
 
-                // If the path is NOT absolute, then make it
-                // relative to our current directory
                 if (!dir.isAbsolute()) {
-                    dir = new File(curr_dir, target_dir);
+                    System.out.println("cd: " + target_dir + ": No such file or directory");
+                    continue;
                 }
 
-                // 4. Your existing check, now on the correct 'dir' object
                 if (dir.exists() && dir.isDirectory()) {
-                    curr_dir = dir.getCanonicalPath();
+                    curr_dir = dir.getAbsolutePath();
                 } else {
                     System.out.println("cd: " + target_dir + ": No such file or directory");
                 }
