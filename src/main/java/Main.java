@@ -40,7 +40,7 @@ public class Main {
 
                 // 2. Handle the "~" (home) directory shortcut
                 if (target_dir.equals("~")) {
-                    target_dir = System.getProperty("user.home");
+                    target_dir = System.getenv("HOME");
                 }
 
                 // 3. THIS IS THE FIX: Handle absolute vs. relative paths
