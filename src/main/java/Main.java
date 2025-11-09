@@ -60,8 +60,6 @@ public class Main {
                     System.out.println("cd: " + target_dir + ": No such file or directory");
                 }
             }
-
-
             //pwd command
             else if (command.equals("pwd")) {
                 System.out.println(curr_dir);
