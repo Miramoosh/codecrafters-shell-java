@@ -51,7 +51,6 @@ public class Main {
                 if (!dir.isAbsolute()) {
                     dir = new File(curr_dir, target_dir);
                 }
-
                 // 4. Check and update the directory
                 if (dir.exists() && dir.isDirectory()) {
                     // MUST use getCanonicalPath() to resolve ".." and "."
