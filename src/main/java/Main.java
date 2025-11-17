@@ -11,7 +11,7 @@ public class Main {
         while (true) {
             System.out.print("$ ");
             String command = scanner.nextLine();
-            String[] commands = command.split(" ");
+            String[] commands = splitthestring(command);
 
             //exit condition
             if (command.equals("exit 0") || command.equals("exit")) break;
@@ -73,6 +73,30 @@ public class Main {
                 }
             }
         }
+    }
+
+    public static String[] splitthestring(String command) {
+        List<String> list = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean flag = false;
+        for (int i = 0; i < command.length(); i++) {
+            char ch = command.charAt(i);
+            if(ch == '\''){
+                flag=!flag;
+        }
+            else if (Character.isWhitespace(ch) && !flag) {
+                if (current.length() > 0) {
+                    list.add(current.toString());
+                    current.setLength(0);
+                }
+            }
+
+            else{
+                list.add(current.toString());
+            }
+
+        }
+        return list.toArray(new String[0]);
     }
 
     public static String type_and_path_handling(String command) {
