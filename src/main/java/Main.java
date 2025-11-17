@@ -90,7 +90,6 @@ public class Main {
                     current.setLength(0);
                 }
             }
-
             else{
                 list.add(current.toString());
             }
