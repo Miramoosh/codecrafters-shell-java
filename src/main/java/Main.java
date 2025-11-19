@@ -89,7 +89,6 @@ public class Main {
                     list.add(current.toString());
                     current.setLength(0);
                 }
-
                 
             }
             else{
