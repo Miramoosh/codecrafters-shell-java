@@ -83,7 +83,7 @@ public class Main {
         for (int i = 0; i < command.length(); i++) {
             char ch = command.charAt(i);
 
-            if (ch == '\'') {
+            if (ch == '\'' || ch=='\"') {
                 inQuotes = !inQuotes; // toggle quoting
             }
             else if (Character.isWhitespace(ch) && !inQuotes) {
