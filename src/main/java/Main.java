@@ -74,7 +74,6 @@ public class Main {
             }
         }
     }
-
     public static String[] splitthestring(String command) {
         List<String> list = new ArrayList<>();
         StringBuilder current = new StringBuilder();
@@ -84,32 +83,49 @@ public class Main {
         for (int i = 0; i < command.length(); i++) {
             char ch = command.charAt(i);
 
-            // Toggle single quotes (only if not in double quotes)
+            // If we see a single-quote and we're not inside double quotes, toggle single-quote mode
             if (ch == '\'' && !inDouble) {
                 inSingle = !inSingle;
-                continue;
+                continue; // do not add quote character to token
             }
 
-            // Toggle double quotes (only if not in single quotes)
+            // If we see a double-quote and we're not inside single quotes, toggle double-quote mode
             if (ch == '"' && !inSingle) {
                 inDouble = !inDouble;
-                continue;
+                continue; // do not add quote character to token
             }
 
-            // Split on whitespace only when OUTSIDE quotes
+            // BACKSLASH HANDLING:
+            // A backslash is an escape character only when it is NOT inside any quotes.
+            // If it's outside quotes: consume next char (if any) and append it literally.
+            if (ch == '\\' && !inSingle && !inDouble) {
+                // Look ahead to the next character
+                if (i + 1 < command.length()) {
+                    char next = command.charAt(i + 1);
+                    current.append(next);
+                    i++; // skip the next character because we've consumed it
+                    continue;
+                } else {
+                    // Backslash at end of line — treat it as literal backslash
+                    current.append('\\');
+                    continue;
+                }
+            }
+
+            // Whitespace outside any quotes separates tokens
             if (Character.isWhitespace(ch) && !inSingle && !inDouble) {
                 if (current.length() > 0) {
                     list.add(current.toString());
                     current.setLength(0);
                 }
-                continue;
+                continue; // skip whitespace
             }
 
-            // Normal char: append to current token
+            // Otherwise append character literally (including backslashes inside quotes)
             current.append(ch);
         }
 
-        // Add last token if exists
+        // Flush final token
         if (current.length() > 0) {
             list.add(current.toString());
         }
