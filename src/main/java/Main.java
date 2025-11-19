@@ -11,15 +11,7 @@ public class Main {
         while (true) {
             System.out.print("$ ");
             String command = scanner.nextLine();
-// Trim leading/trailing whitespace — prevents empty first token when input has leading spaces
-            if (command == null) command = "";
-            command = command.trim();
-
-// Use the quote-aware splitter (or simple split if you haven't added it)
             String[] commands = splitthestring(command);
-
-// If user pressed Enter (empty command), continue to next loop
-            if (commands.length == 0) continue;
 
             //exit condition
             if (command.equals("exit 0") || command.equals("exit")) break;
@@ -86,26 +78,35 @@ public class Main {
     public static String[] splitthestring(String command) {
         List<String> list = new ArrayList<>();
         StringBuilder current = new StringBuilder();
-        boolean flag = false;
+        boolean inQuotes = false;
+
         for (int i = 0; i < command.length(); i++) {
             char ch = command.charAt(i);
-            if(ch == '\''){
-                flag=!flag;
-        }
-            else if (Character.isWhitespace(ch) && !flag) {
+
+            if (ch == '\'') {
+                inQuotes = !inQuotes; // toggle quoting
+            }
+            else if (Character.isWhitespace(ch) && !inQuotes) {
+                // whitespace outside quotes splits tokens
                 if (current.length() > 0) {
                     list.add(current.toString());
                     current.setLength(0);
                 }
-
             }
-            else{
-                list.add(current.toString());
+            else {
+                // normal character → append to current token
+                current.append(ch);
             }
-
         }
+
+        // Add last token if exists
+        if (current.length() > 0) {
+            list.add(current.toString());
+        }
+
         return list.toArray(new String[0]);
     }
+
 
     public static String type_and_path_handling(String command) {
         String[] cmd = {"exit", "echo", "type","pwd","cd"};
