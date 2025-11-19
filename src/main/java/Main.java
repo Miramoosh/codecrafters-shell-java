@@ -11,7 +11,15 @@ public class Main {
         while (true) {
             System.out.print("$ ");
             String command = scanner.nextLine();
+// Trim leading/trailing whitespace — prevents empty first token when input has leading spaces
+            if (command == null) command = "";
+            command = command.trim();
+
+// Use the quote-aware splitter (or simple split if you haven't added it)
             String[] commands = splitthestring(command);
+
+// If user pressed Enter (empty command), continue to next loop
+            if (commands.length == 0) continue;
 
             //exit condition
             if (command.equals("exit 0") || command.equals("exit")) break;
@@ -89,7 +97,7 @@ public class Main {
                     list.add(current.toString());
                     current.setLength(0);
                 }
-                
+
             }
             else{
                 list.add(current.toString());
