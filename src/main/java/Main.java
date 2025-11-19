@@ -78,25 +78,35 @@ public class Main {
     public static String[] splitthestring(String command) {
         List<String> list = new ArrayList<>();
         StringBuilder current = new StringBuilder();
-        boolean inQuotes = false;
+        boolean inSingle = false;
+        boolean inDouble = false;
 
         for (int i = 0; i < command.length(); i++) {
             char ch = command.charAt(i);
 
-            if (ch == '\'' || ch=='\"') {
-                inQuotes = !inQuotes; // toggle quoting
+            // Toggle single quotes (only if not in double quotes)
+            if (ch == '\'' && !inDouble) {
+                inSingle = !inSingle;
+                continue;
             }
-            else if (Character.isWhitespace(ch) && !inQuotes) {
-                // whitespace outside quotes splits tokens
+
+            // Toggle double quotes (only if not in single quotes)
+            if (ch == '"' && !inSingle) {
+                inDouble = !inDouble;
+                continue;
+            }
+
+            // Split on whitespace only when OUTSIDE quotes
+            if (Character.isWhitespace(ch) && !inSingle && !inDouble) {
                 if (current.length() > 0) {
                     list.add(current.toString());
                     current.setLength(0);
                 }
+                continue;
             }
-            else {
-                // normal character → append to current token
-                current.append(ch);
-            }
+
+            // Normal char: append to current token
+            current.append(ch);
         }
 
         // Add last token if exists
@@ -106,6 +116,7 @@ public class Main {
 
         return list.toArray(new String[0]);
     }
+
 
 
     public static String type_and_path_handling(String command) {
