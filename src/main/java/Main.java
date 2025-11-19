@@ -83,55 +83,75 @@ public class Main {
         for (int i = 0; i < command.length(); i++) {
             char ch = command.charAt(i);
 
-            // If we see a single-quote and we're not inside double quotes, toggle single-quote mode
+            // --- Handle single quote ---
             if (ch == '\'' && !inDouble) {
                 inSingle = !inSingle;
-                continue; // do not add quote character to token
+                continue;
             }
 
-            // If we see a double-quote and we're not inside single quotes, toggle double-quote mode
+            // --- Handle double quote ---
             if (ch == '"' && !inSingle) {
                 inDouble = !inDouble;
-                continue; // do not add quote character to token
+                continue;
             }
 
-            // BACKSLASH HANDLING:
-            // A backslash is an escape character only when it is NOT inside any quotes.
-            // If it's outside quotes: consume next char (if any) and append it literally.
-            if (ch == '\\' && !inSingle && !inDouble) {
-                // Look ahead to the next character
-                if (i + 1 < command.length()) {
-                    char next = command.charAt(i + 1);
-                    current.append(next);
-                    i++; // skip the next character because we've consumed it
-                    continue;
-                } else {
-                    // Backslash at end of line — treat it as literal backslash
-                    current.append('\\');
-                    continue;
+            // --- Handle backslash ---
+            if (ch == '\\') {
+
+                // Case 1: inside double quotes → escape only ", \
+                if (inDouble) {
+                    if (i + 1 < command.length()) {
+                        char next = command.charAt(i + 1);
+
+                        if (next == '"' || next == '\\') {
+                            current.append(next);
+                            i++;        // consume next character
+                            continue;
+                        }
+
+                        // otherwise: keep backslash literally
+                        current.append('\\');
+                        continue;
+                    }
                 }
+
+                // Case 2: outside quotes → escape ANY next character
+                if (!inSingle && !inDouble) {
+                    if (i + 1 < command.length()) {
+                        current.append(command.charAt(i + 1));
+                        i++;
+                        continue;
+                    } else {
+                        current.append('\\');
+                        continue;
+                    }
+                }
+
+                // Case 3: inside single quotes → literal `\`
+                current.append('\\');
+                continue;
             }
 
-            // Whitespace outside any quotes separates tokens
+            // --- Whitespace splitting ONLY outside quotes ---
             if (Character.isWhitespace(ch) && !inSingle && !inDouble) {
                 if (current.length() > 0) {
                     list.add(current.toString());
                     current.setLength(0);
                 }
-                continue; // skip whitespace
+                continue;
             }
 
-            // Otherwise append character literally (including backslashes inside quotes)
+            // --- Normal character ---
             current.append(ch);
         }
 
-        // Flush final token
         if (current.length() > 0) {
             list.add(current.toString());
         }
 
         return list.toArray(new String[0]);
     }
+
 
 
 
