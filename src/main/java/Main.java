@@ -12,26 +12,24 @@ public class Main {
             String input = scanner.nextLine().trim();
             if (input.isEmpty()) continue;
 
-            String[] parts = input.split(" ");
+            String[] raw = input.split(" ");
             List<String> cmd = new ArrayList<>();
             String outFile = null, errFile = null;
 
-            for (int i = 0; i < parts.length; i++) {
-                if (parts[i].equals(">") || parts[i].equals("1>")) {
-                    outFile = parts[++i];
-                }
-                else if (parts[i].equals("2>")) {
-                    errFile = parts[++i];
-                }
-                else cmd.add(parts[i]);
+            // ---------------- Parse arguments ----------------
+            for (int i = 0; i < raw.length; i++) {
+                if (raw[i].equals(">") || raw[i].equals("1>")) outFile = raw[++i];
+                else if (raw[i].equals("2>")) errFile = raw[++i];
+                else cmd.add(raw[i]);
             }
 
             if (cmd.size() == 0) continue;
             String command = cmd.get(0);
 
+            // ---------------- EXIT ----------------
             if (command.equals("exit") || input.equals("exit 0")) break;
 
-                // ---------------- ECHO ----------------
+                // ---------------- ECHO (FIXED) ----------------
             else if (command.equals("echo")) {
                 StringBuilder sb = new StringBuilder();
                 for (int i = 1; i < cmd.size(); i++) {
@@ -39,9 +37,13 @@ public class Main {
                     sb.append(cmd.get(i));
                 }
 
-                if (errFile != null) write(errFile, sb + "\n");
-                else if (outFile != null) write(outFile, sb + "\n");
-                else System.out.println(sb);
+                String result = sb.toString() + "\n";
+
+                if (errFile != null)       write(errFile, result);   // 2> redirection
+                else if (outFile != null)  write(outFile, result);   // >, 1>
+                else                       System.out.print(result); // normal
+
+                continue;
             }
 
             // ---------------- CD ----------------
@@ -49,26 +51,32 @@ public class Main {
                 if (cmd.size() < 2) { System.out.println("cd: missing argument"); continue; }
 
                 String target = cmd.get(1);
-
                 if (target.equals("~")) target = System.getenv("HOME");
+
                 File dir = new File(target);
                 if (!dir.isAbsolute()) dir = new File(curr_dir, target);
 
-                if (dir.exists() && dir.isDirectory()) curr_dir = dir.getCanonicalPath();
-                else System.out.println("cd: " + target + ": No such file or directory");
+                if (dir.exists() && dir.isDirectory())
+                    curr_dir = dir.getCanonicalPath();
+                else
+                    System.out.println("cd: " + target + ": No such file or directory");
+
+                continue;
             }
 
             // ---------------- PWD ----------------
             else if (command.equals("pwd")) {
                 System.out.println(curr_dir);
+                continue;
             }
 
             // ---------------- TYPE ----------------
             else if (command.equals("type")) {
                 System.out.println(type(cmd.get(1)));
+                continue;
             }
 
-            // ---------------- EXTERNAL COMMANDS ----------------
+            // ---------------- External Commands ----------------
             else {
                 String exec = find(cmd.get(0));
                 if (exec != null) run(exec, cmd, curr_dir, outFile, errFile);
@@ -77,28 +85,31 @@ public class Main {
         }
     }
 
+    // ---------------- TYPE HANDLER ----------------
     static String type(String c) {
-        String[] b = {"echo","cd","pwd","exit","type"};
-        for (String x : b) if (x.equals(c)) return c + " is a shell builtin";
-        String e = find(c);
-        return (e != null) ? c+" is "+e : c+": not found";
+        String[] builtins = {"echo","cd","pwd","exit","type"};
+        for (String b : builtins)
+            if (b.equals(c)) return c + " is a shell builtin";
+
+        String p = find(c);
+        return (p != null) ? c + " is " + p : c + ": not found";
     }
 
-    static String find(String cmd) {
-        String path = System.getenv("PATH");
-        for (String dir : path.split(File.pathSeparator))
-        {
-            File f = new File(dir, cmd);
+    // ---------------- Find executable in PATH ----------------
+    static String find(String c) {
+        for (String dir : System.getenv("PATH").split(File.pathSeparator)) {
+            File f = new File(dir, c);
             if (f.exists() && f.isFile() && f.canExecute()) return f.getAbsolutePath();
         }
         return null;
     }
 
-    static void run(String exec, List<String> args, String dir,
+    // ---------------- Run external program with redirection ----------------
+    static void run(String exec, List<String> args, String cwd,
                     String outFile, String errFile) {
         try {
             ProcessBuilder pb = new ProcessBuilder(args);
-            pb.directory(new File(dir));
+            pb.directory(new File(cwd));
 
             if (outFile != null) pb.redirectOutput(new File(outFile));
             if (errFile != null) pb.redirectError(new File(errFile));
@@ -107,12 +118,12 @@ public class Main {
 
             Process p = pb.start();
             p.waitFor();
-
-        } catch(Exception e){}
+        } catch (Exception ignored) {}
     }
 
+    // ---------------- File writer for redirection ----------------
     static void write(String file, String text) {
         try (FileWriter fw = new FileWriter(file)) { fw.write(text); }
-        catch(Exception ignored){}
+        catch (Exception ignored) {}
     }
 }
