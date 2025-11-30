@@ -1,4 +1,6 @@
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.PrintStream;
 import java.util.Objects;
 import java.util.Scanner;
 import java.util.ArrayList;
@@ -7,73 +9,194 @@ import java.util.List;
 public class Main {
     public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
-        String curr_dir=System.getProperty("user.dir");
+        String curr_dir = System.getProperty("user.dir");
+
         while (true) {
             System.out.print("$ ");
             String command = scanner.nextLine();
-            String[] commands = splitthestring(command);
+            if (command == null) command = "";
+            command = command.trim();
 
-            //exit condition
-            if (command.equals("exit 0") || command.equals("exit")) break;
+            // Tokenize (quote/backslash aware)
+            String[] raw = splitthestring(command);
+            if (raw.length == 0) continue;
 
-            //type command
-            else if (commands[0].equals("type")) {
-                String a = type_and_path_handling(commands[1]);
-                System.out.println(a);
+            // exit handling: "exit" or "exit 0"
+            if (raw[0].equals("exit") && (raw.length == 1 || (raw.length > 1 && raw[1].equals("0")))) {
+                break;
             }
-            //echo command
-            else if (commands[0].equals("echo")) {
-                for (int i = 1; i < commands.length; i++) {
-                    System.out.print(commands[i] + " ");
+
+            // Parse redirection and build argument list (argsList)
+            List<String> argsList = new ArrayList<>();
+            String outRedirectPath = null;
+
+            for (int i = 0; i < raw.length; i++) {
+                String tok = raw[i];
+
+                // exact tokens: ">" or "1>"
+                if (tok.equals(">") || tok.equals("1>")) {
+                    if (i + 1 < raw.length) {
+                        outRedirectPath = raw[++i];
+                    }
+                    // else ignore (malformed) - no filename
+                    continue;
                 }
-                System.out.println();
-            }
-            else if (commands[0].equals("cd")) {
 
-                // 1. Handle "cd" with no arguments
-                if (commands.length < 2) {
+                // combined forms like ">filename" or "1>filename"
+                if (tok.startsWith("1>") || tok.startsWith(">")) {
+                    int idx = tok.indexOf('>');
+                    String pathPart = tok.substring(idx + 1);
+                    if (!pathPart.isEmpty()) {
+                        outRedirectPath = pathPart;
+                        continue;
+                    } else {
+                        // if nothing after '>', look for next token (already handled above)
+                        continue;
+                    }
+                }
+
+                // Normal argument
+                argsList.add(tok);
+            }
+
+            if (argsList.size() == 0) {
+                // nothing to execute (e.g., only redirection) — skip
+                continue;
+            }
+
+            // Now dispatch commands based on argsList
+            String cmd0 = argsList.get(0);
+
+            // type builtin
+            if (cmd0.equals("type")) {
+                if (argsList.size() < 2) {
+                    System.out.println("type: missing argument");
+                    continue;
+                }
+                String res = type_and_path_handling(argsList.get(1));
+                if (outRedirectPath != null) {
+                    writeStringToFile(outRedirectPath, res + System.lineSeparator());
+                } else {
+                    System.out.println(res);
+                }
+            }
+
+            // echo builtin
+            else if (cmd0.equals("echo")) {
+                StringBuilder sb = new StringBuilder();
+                for (int i = 1; i < argsList.size(); i++) {
+                    if (i > 1) sb.append(" ");
+                    sb.append(argsList.get(i));
+                }
+                String out = sb.toString();
+                if (outRedirectPath != null) {
+                    writeStringToFile(outRedirectPath, out + System.lineSeparator());
+                } else {
+                    System.out.println(out);
+                }
+            }
+
+            // cd builtin
+            else if (cmd0.equals("cd")) {
+                if (argsList.size() < 2) {
                     System.out.println("cd: missing argument");
-                    continue; // Skips to the next loop
+                    continue;
                 }
-
-                String target_dir = commands[1];
-
-                // 2. Handle the "~" (home) directory shortcut
+                String target_dir = argsList.get(1);
                 if (target_dir.equals("~")) {
                     target_dir = System.getenv("HOME");
                 }
-
-                // 3. THIS IS THE FIX: Handle absolute vs. relative paths
                 File dir = new File(target_dir);
-
-                // If the path is NOT absolute, then make it
-                // relative to our current directory
                 if (!dir.isAbsolute()) {
                     dir = new File(curr_dir, target_dir);
                 }
-                // 4. Check and update the directory
-                if (dir.exists() && dir.isDirectory()) {
-                    // MUST use getCanonicalPath() to resolve ".." and "."
-                    curr_dir = dir.getCanonicalPath();
-                } else {
-                    System.out.println("cd: " + target_dir + ": No such file or directory");
+                try {
+                    File canonical = dir.getCanonicalFile();
+                    if (canonical.exists() && canonical.isDirectory()) {
+                        curr_dir = canonical.getAbsolutePath();
+                    } else {
+                        System.out.println("cd: " + argsList.get(1) + ": No such file or directory");
+                    }
+                } catch (java.io.IOException e) {
+                    System.out.println("cd: " + argsList.get(1) + ": No such file or directory");
                 }
             }
-            //pwd command
-            else if (command.equals("pwd")) {
-                System.out.println(curr_dir);
+
+            // pwd builtin
+            else if (cmd0.equals("pwd")) {
+                if (outRedirectPath != null) {
+                    writeStringToFile(outRedirectPath, curr_dir + System.lineSeparator());
+                } else {
+                    System.out.println(curr_dir);
+                }
             }
-            // external programs (search PATH and run)
+
+            // external programs
             else {
-                String executablePath = findExecutable(commands[0]);
+                String executablePath = findExecutable(cmd0);
                 if (executablePath != null) {
-                    runExternalProgram(executablePath, commands,curr_dir);
+                    // Build cmdList from argsList (these are already parsed tokens)
+                    List<String> cmdList = new ArrayList<>(argsList);
+
+                    if (outRedirectPath != null) {
+                        // Run with stdout redirected to file (stderr still inherited)
+                        try {
+                            File execFile = new File(executablePath);
+                            String parentDir = execFile.getParent();
+
+                            ProcessBuilder pb = new ProcessBuilder(cmdList);
+                            pb.directory(new File(curr_dir));
+
+                            if (parentDir != null) {
+                                String origPath = System.getenv("PATH");
+                                String newPath = parentDir + File.pathSeparator + (origPath != null ? origPath : "");
+                                pb.environment().put("PATH", newPath);
+                            }
+
+                            // Ensure parent dirs for output file exist
+                            File outFile = new File(outRedirectPath);
+                            File parent = outFile.getParentFile();
+                            if (parent != null && !parent.exists()) {
+                                parent.mkdirs();
+                            }
+
+                            pb.redirectOutput(outFile); // stdout -> file (truncated)
+                            pb.redirectError(ProcessBuilder.Redirect.INHERIT); // stderr -> console
+                            pb.redirectInput(ProcessBuilder.Redirect.INHERIT); // stdin from console
+                            Process p = pb.start();
+                            p.waitFor();
+                        } catch (Exception e) {
+                            System.out.println("Error running program: " + e.getMessage());
+                        }
+                    } else {
+                        // No redirection — preserve existing behavior
+                        // Convert cmdList to array and call runExternalProgram
+                        String[] arr = cmdList.toArray(new String[0]);
+                        runExternalProgram(executablePath, arr, curr_dir);
+                    }
                 } else {
-                    System.out.println(commands[0] + ": command not found");
+                    System.out.println(cmd0 + ": command not found");
                 }
             }
+        } // end while
+    } // end main
+
+    // Helper: write a string to a file (create parent dirs), overwrite file
+    public static void writeStringToFile(String path, String content) {
+        try {
+            File outFile = new File(path);
+            File parent = outFile.getParentFile();
+            if (parent != null && !parent.exists()) parent.mkdirs();
+            try (FileOutputStream fos = new FileOutputStream(outFile, false);
+                 PrintStream ps = new PrintStream(fos)) {
+                ps.print(content);
+            }
+        } catch (Exception e) {
+            System.out.println("Error writing to file: " + e.getMessage());
         }
     }
+
+    // Tokenizer that supports quotes and backslash rules (keeps behavior from previous stages)
     public static String[] splitthestring(String command) {
         List<String> list = new ArrayList<>();
         StringBuilder current = new StringBuilder();
@@ -83,39 +206,43 @@ public class Main {
         for (int i = 0; i < command.length(); i++) {
             char ch = command.charAt(i);
 
-            // --- Handle single quote ---
+            // Toggle single-quote mode only when not inside double quotes
             if (ch == '\'' && !inDouble) {
                 inSingle = !inSingle;
-                continue;
+                continue; // don't include the quote character
             }
 
-            // --- Handle double quote ---
+            // Toggle double-quote mode only when not inside single quotes
             if (ch == '"' && !inSingle) {
                 inDouble = !inDouble;
-                continue;
+                continue; // don't include the quote character
             }
 
-            // --- Handle backslash ---
+            // Backslash handling:
+            // - Outside any quotes: backslash escapes any next char
+            // - Inside single quotes: backslash is literal
+            // - Inside double quotes: backslash escapes only " and \ (per current stage)
             if (ch == '\\') {
-
-                // Case 1: inside double quotes → escape only ", \
+                // inside double quotes: only \" and \\ are special (escape)
                 if (inDouble) {
                     if (i + 1 < command.length()) {
                         char next = command.charAt(i + 1);
-
                         if (next == '"' || next == '\\') {
                             current.append(next);
-                            i++;        // consume next character
+                            i++;
+                            continue;
+                        } else {
+                            // backslash remains literal inside double quotes for other chars
+                            current.append('\\');
                             continue;
                         }
-
-                        // otherwise: keep backslash literally
+                    } else {
                         current.append('\\');
                         continue;
                     }
                 }
 
-                // Case 2: outside quotes → escape ANY next character
+                // outside quotes: escape next char (if any)
                 if (!inSingle && !inDouble) {
                     if (i + 1 < command.length()) {
                         current.append(command.charAt(i + 1));
@@ -127,12 +254,12 @@ public class Main {
                     }
                 }
 
-                // Case 3: inside single quotes → literal `\`
+                // inside single quotes: literal backslash
                 current.append('\\');
                 continue;
             }
 
-            // --- Whitespace splitting ONLY outside quotes ---
+            // Whitespace outside any quotes splits tokens
             if (Character.isWhitespace(ch) && !inSingle && !inDouble) {
                 if (current.length() > 0) {
                     list.add(current.toString());
@@ -141,7 +268,7 @@ public class Main {
                 continue;
             }
 
-            // --- Normal character ---
+            // Normal character: append
             current.append(ch);
         }
 
@@ -152,11 +279,8 @@ public class Main {
         return list.toArray(new String[0]);
     }
 
-
-
-
     public static String type_and_path_handling(String command) {
-        String[] cmd = {"exit", "echo", "type","pwd","cd"};
+        String[] cmd = {"exit", "echo", "type", "pwd", "cd"};
         String pathEnv = System.getenv("PATH");
         String[] directory = pathEnv.split(File.pathSeparator, -1);
         for (String i : cmd) {
@@ -190,7 +314,7 @@ public class Main {
         return null;
     }
 
-    public static void runExternalProgram(String executablePath, String[] args,String currentDirectory) {
+    public static void runExternalProgram(String executablePath, String[] args, String currentDirectory) {
         try {
             File execFile = new File(executablePath);
             String parentDir = execFile.getParent();
@@ -207,8 +331,7 @@ public class Main {
 
             ProcessBuilder pb = new ProcessBuilder(cmdList);
 
-            //This line explicitly tells the ProcessBuilder: "Hey, before you start this new program (ls),
-            // set its starting directory to this path."
+            // set child's working directory
             pb.directory(new File(currentDirectory));
             // Prepend the executable's directory to the child's PATH so the OS will resolve
             // the shortName to the correct absolute file we already found.
@@ -219,17 +342,9 @@ public class Main {
             }
 
             // Inherit IO so the external program's stdout/stderr/stdin show in our console
-            //Without this line we have to add extra code to our program to print the output in the
-            //same console ,With it, it's automatic and easy.
             pb.inheritIO();
 
-            // it is like a remote control for the pb.start function
-            //process is a class
-            //Why do you need that remote control? For the very next line
-            // p.waitFor(), which is like using the remote to ask, "Are you done yet?"
             Process p = pb.start();
-
-            // Wait for the program to finish before returning to the shell prompt
             p.waitFor();
         } catch (Exception e) {
             System.out.println("Error running program: " + e.getMessage());
