@@ -15,28 +15,31 @@ public class Main {
 
             String[] raw = input.split(" ");
             List<String> cmd = new ArrayList<>();
+
             String outFile = null, errFile = null;
 
-            // ---------------- Parse for redirection ----------------
+            // ---------------- parse redirection ----------------
             for (int i = 0; i < raw.length; i++) {
-                if (raw[i].equals(">") || raw[i].equals("1>"))
+
+                if (raw[i].equals(">") || raw[i].equals("1>")) {
                     outFile = raw[++i];
-                else if (raw[i].equals("2>"))
+                }
+                else if (raw[i].equals("2>")) {
                     errFile = raw[++i];
-                else
+                }
+                else {
                     cmd.add(raw[i]);
+                }
             }
 
             if (cmd.size() == 0) continue;
             String command = cmd.get(0);
 
-
-            // ---------------- EXIT ----------------
+            // ---------------- exit ----------------
             if (command.equals("exit") || input.equals("exit 0"))
                 break;
 
-
-                // ---------------- FIXED - ECHO (stderr redirection) ----------------
+                // ---------------- FIXED ECHO BLOCK ----------------
             else if (command.equals("echo")) {
 
                 StringBuilder sb = new StringBuilder();
@@ -46,15 +49,20 @@ public class Main {
                 }
                 String result = sb.toString() + "\n";
 
-                if (errFile != null) writeToFile(errFile, result);  // 2> output → file
-                else if (outFile != null) writeToFile(outFile, result); // > or 1> → file
-                else System.out.print(result); // no redirection → print normally
-
+                // 👇 THIS IS THE FIX
+                if (errFile != null) {
+                    write(errFile, result);         // echo text → STDERR redirection
+                }
+                else if (outFile != null) {
+                    write(outFile, result);         // redirect stdout
+                }
+                else {
+                    System.out.print(result);       // normal echo prints to screen
+                }
                 continue;
             }
 
-
-            // ---------------- CD ----------------
+            // ---------------- cd ----------------
             else if (command.equals("cd")) {
                 if (cmd.size() < 2) { System.out.println("cd: missing argument"); continue; }
 
@@ -68,28 +76,24 @@ public class Main {
                     curr_dir = dir.getCanonicalPath();
                 else
                     System.out.println("cd: " + target + ": No such file or directory");
-
                 continue;
             }
 
-
-            // ---------------- PWD ----------------
+            // ---------------- pwd ----------------
             else if (command.equals("pwd")) {
                 System.out.println(curr_dir);
                 continue;
             }
 
-
-            // ---------------- TYPE ----------------
+            // ---------------- type ----------------
             else if (command.equals("type")) {
-                System.out.println(typeOf(cmd.get(1)));
+                System.out.println(type(cmd.get(1)));
                 continue;
             }
 
-
-            // ---------------- EXTERNAL COMMAND ----------------
+            // ---------------- run external program ----------------
             else {
-                String exec = findExecutable(cmd.get(0));
+                String exec = find(cmd.get(0));
                 if (exec != null)
                     run(exec, cmd, curr_dir, outFile, errFile);
                 else
@@ -98,23 +102,19 @@ public class Main {
         }
     }
 
-
-    // ============= TYPE BUILTIN =============
-    static String typeOf(String c) {
+    // ===== TYPE BUILTIN =====
+    static String type(String name) {
         String[] builtins = {"echo","cd","pwd","exit","type"};
-        for (String x : builtins)
-            if (x.equals(c))
-                return c + " is a shell builtin";
+        for (String b : builtins)
+            if (b.equals(name)) return name + " is a shell builtin";
 
-        String p = findExecutable(c);
-        return p != null ? c+" is "+p : c+": not found";
+        String path = find(name);
+        return (path != null) ? name+" is "+path : name+": not found";
     }
 
-
-    // ============= PATH LOOKUP =============
-    static String findExecutable(String name) {
-        String[] path = System.getenv("PATH").split(File.pathSeparator);
-        for (String d : path) {
+    // ===== find executable in PATH =====
+    static String find(String name) {
+        for (String d : System.getenv("PATH").split(File.pathSeparator)) {
             File f = new File(d, name);
             if (f.exists() && f.isFile() && f.canExecute())
                 return f.getAbsolutePath();
@@ -122,11 +122,9 @@ public class Main {
         return null;
     }
 
-
-    // ============= RUN EXTERNAL COMMANDS =============
+    // ===== run external command with redirection =====
     static void run(String exec, List<String> args, String dir,
                     String outFile, String errFile) {
-
         try {
             ProcessBuilder pb = new ProcessBuilder(args);
             pb.directory(new File(dir));
@@ -135,17 +133,17 @@ public class Main {
             if (errFile != null) pb.redirectError(new File(errFile));
 
             if (outFile == null && errFile == null)
-                pb.inheritIO(); // only inherit when nothing redirected
+                pb.inheritIO();          // Only print to console if no redirect
 
             Process p = pb.start();
             p.waitFor();
+
         } catch (Exception ignored) {}
     }
 
-
-    // ============= WRITE TO FILE =============
-    static void writeToFile(String file, String text) {
-        try (FileWriter f = new FileWriter(file)) { f.write(text); }
+    // ===== File writer =====
+    static void write(String file, String text) {
+        try (FileWriter fw = new FileWriter(file)) { fw.write(text); }
         catch (Exception ignored) {}
     }
 }
