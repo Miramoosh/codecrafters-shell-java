@@ -2,133 +2,100 @@ import java.io.*;
 import java.util.*;
 
 public class Main {
-    public static void main(String[] args) throws Exception {
 
+    public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
         String curr_dir = System.getProperty("user.dir");
 
         while (true) {
-
             System.out.print("$ ");
-            String raw = scanner.nextLine();
+            String input = scanner.nextLine().trim();
+            if (input.isEmpty()) continue;
 
-            if (raw.equals("exit") || raw.equals("exit 0")) break;
-
-            String[] parts = parse(raw);
-            if (parts.length == 0) continue;
-
-            // Detect redirection
-            String outFile = null, errFile = null;
+            String[] parts = input.split(" ");
             List<String> cmd = new ArrayList<>();
+            String outFile = null, errFile = null;
 
             for (int i = 0; i < parts.length; i++) {
                 if (parts[i].equals(">") || parts[i].equals("1>")) {
-                    outFile = parts[i + 1];
-                    i++;
-                } else if (parts[i].equals("2>")) {
-                    errFile = parts[i + 1];
-                    i++;
-                } else cmd.add(parts[i]);
-            }
-
-            // Final command list to execute
-            String[] commands = cmd.toArray(new String[0]);
-            if (commands.length == 0) continue;
-
-            /* ================= BUILTINS ================= */
-
-            if (commands[0].equals("type")) {
-                String res = typeAndPath(commands[1]);
-                printOrRedirect(res, outFile, errFile);
-                continue;
-            }
-
-            if (commands[0].equals("echo")) {
-                String msg = String.join(" ", Arrays.copyOfRange(commands, 1, commands.length));
-                printOrRedirect(msg, outFile, errFile);
-                continue;
-            }
-
-            if (commands[0].equals("pwd")) {
-                printOrRedirect(curr_dir, outFile, errFile);
-                continue;
-            }
-
-            if (commands[0].equals("cd")) {
-                if (commands.length < 2) {
-                    printErr("cd: missing argument", errFile);
-                    continue;
+                    outFile = parts[++i];
                 }
-                String path = commands[1];
+                else if (parts[i].equals("2>")) {
+                    errFile = parts[++i];
+                }
+                else cmd.add(parts[i]);
+            }
 
-                if (path.equals("~")) path = System.getenv("HOME");
+            if (cmd.size() == 0) continue;
+            String command = cmd.get(0);
 
-                File dir = new File(path);
-                if (!dir.isAbsolute()) dir = new File(curr_dir, path);
+            if (command.equals("exit") || input.equals("exit 0")) break;
+
+                // ---------------- ECHO ----------------
+            else if (command.equals("echo")) {
+                StringBuilder sb = new StringBuilder();
+                for (int i = 1; i < cmd.size(); i++) {
+                    if (i > 1) sb.append(" ");
+                    sb.append(cmd.get(i));
+                }
+
+                if (errFile != null) write(errFile, sb + "\n");
+                else if (outFile != null) write(outFile, sb + "\n");
+                else System.out.println(sb);
+            }
+
+            // ---------------- CD ----------------
+            else if (command.equals("cd")) {
+                if (cmd.size() < 2) { System.out.println("cd: missing argument"); continue; }
+
+                String target = cmd.get(1);
+
+                if (target.equals("~")) target = System.getenv("HOME");
+                File dir = new File(target);
+                if (!dir.isAbsolute()) dir = new File(curr_dir, target);
 
                 if (dir.exists() && dir.isDirectory()) curr_dir = dir.getCanonicalPath();
-                else printErr("cd: " + path + ": No such file or directory", errFile);
-                continue;
+                else System.out.println("cd: " + target + ": No such file or directory");
             }
 
-            /* ================= EXECUTABLE PROGRAM ================= */
-
-            String exec = findExecutable(commands[0]);
-
-            if (exec == null) {
-                printErr(commands[0] + ": command not found", errFile);
-                continue;
+            // ---------------- PWD ----------------
+            else if (command.equals("pwd")) {
+                System.out.println(curr_dir);
             }
 
-            run(exec, commands, curr_dir, outFile, errFile);
+            // ---------------- TYPE ----------------
+            else if (command.equals("type")) {
+                System.out.println(type(cmd.get(1)));
+            }
+
+            // ---------------- EXTERNAL COMMANDS ----------------
+            else {
+                String exec = find(cmd.get(0));
+                if (exec != null) run(exec, cmd, curr_dir, outFile, errFile);
+                else System.out.println(command + ": command not found");
+            }
         }
     }
 
-    /* ===================== STRING SPLITTER ===================== */
-
-    public static String[] parse(String s) {
-        List<String> list = new ArrayList<>();
-        StringBuilder cur = new StringBuilder();
-        boolean sQ = false, dQ = false, esc = false;
-
-        for (char c : s.toCharArray()) {
-            if (esc) {
-                cur.append(c);
-                esc = false;
-            }
-            else if (c == '\\' && dQ) esc = true;
-            else if (c == '\'' && !dQ) sQ = !sQ;
-            else if (c == '"' && !sQ) dQ = !dQ;
-            else if (Character.isWhitespace(c) && !sQ && !dQ) {
-                if (cur.length() > 0) { list.add(cur.toString()); cur.setLength(0); }
-            }
-            else cur.append(c);
-        }
-        if (cur.length() > 0) list.add(cur.toString());
-        return list.toArray(new String[0]);
+    static String type(String c) {
+        String[] b = {"echo","cd","pwd","exit","type"};
+        for (String x : b) if (x.equals(c)) return c + " is a shell builtin";
+        String e = find(c);
+        return (e != null) ? c+" is "+e : c+": not found";
     }
 
-    /* ================= PATH + TYPE ================= */
-
-    static String typeAndPath(String cmd) {
-        String[] builtins = {"echo", "cd", "pwd", "type", "exit"};
-        for (String b : builtins) if (b.equals(cmd)) return b + " is a shell builtin";
-
-        String exec = findExecutable(cmd);
-        return (exec != null) ? cmd + " is " + exec : cmd + ": not found";
-    }
-
-    static String findExecutable(String cmd) {
-        for (String dir : System.getenv("PATH").split(File.pathSeparator)) {
+    static String find(String cmd) {
+        String path = System.getenv("PATH");
+        for (String dir : path.split(File.pathSeparator))
+        {
             File f = new File(dir, cmd);
-            if (f.exists() && f.canExecute()) return f.getAbsolutePath();
+            if (f.exists() && f.isFile() && f.canExecute()) return f.getAbsolutePath();
         }
         return null;
     }
 
-    /* ================= RUN EXTERNAL PROGRAM ================= */
-
-    static void run(String exec, String[] args, String dir, String outFile, String errFile) {
+    static void run(String exec, List<String> args, String dir,
+                    String outFile, String errFile) {
         try {
             ProcessBuilder pb = new ProcessBuilder(args);
             pb.directory(new File(dir));
@@ -136,29 +103,16 @@ public class Main {
             if (outFile != null) pb.redirectOutput(new File(outFile));
             if (errFile != null) pb.redirectError(new File(errFile));
 
-            pb.inheritIO();
+            if (outFile == null && errFile == null) pb.inheritIO();
+
             Process p = pb.start();
             p.waitFor();
 
-        } catch (Exception e) {}
+        } catch(Exception e){}
     }
 
-    /* ================= REDIRECTION UTIL ================= */
-
-    static void printOrRedirect(String msg, String out, String err) {
-        if (err != null) write(err, msg);
-        else if (out != null) write(out, msg);
-        else System.out.println(msg);
-    }
-
-    static void printErr(String msg, String errFile) {
-        if (errFile != null) write(errFile, msg);
-        else System.err.println(msg);
-    }
-
-    static void write(String file, String data) {
-        try (FileWriter fw = new FileWriter(file)) {
-            fw.write(data + "\n");
-        } catch (Exception ignored) {}
+    static void write(String file, String text) {
+        try (FileWriter fw = new FileWriter(file)) { fw.write(text); }
+        catch(Exception ignored){}
     }
 }
